@@ -715,5 +715,72 @@
             }
         }
     </script>
-</body>
-</html>
+<script>
+    // Configuración del Gráfico
+    const ctx = document.getElementById('predictionChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'],
+            datasets: [{
+                label: 'Stock en Local (Proyectado)',
+                data: [80, 75, 60, 40, 15, 5, 0],
+                borderColor: '#ff5252', tension: 0.4
+            }, {
+                label: 'Stock Sugerido por VibePredict',
+                data: [80, 75, 60, 90, 120, 110, 85],
+                borderColor: '#00e676', backgroundColor: 'rgba(0, 230, 118, 0.1)', fill: true, tension: 0.4
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { grid: { color: '#333' } }, x: { grid: { color: '#333' } } } }
+    });
+
+    // Lógica de conexión a la IA (Actualizada a Gemini 1.5)
+    async function askAI() {
+        const input = document.getElementById('userInput').value;
+        // .trim() elimina espacios en blanco accidentales al copiar la clave
+        const apiKey = document.getElementById('apiKey').value.trim(); 
+        const chatBox = document.getElementById('chat-box');
+        
+        if (!apiKey) { alert("¡Jefe, necesitas ingresar la API Key arriba!"); return; }
+        if (!input) return;
+
+        // Mostrar pregunta del usuario
+        chatBox.innerHTML += `<div class="bg-gray-700 p-3 rounded-lg self-end text-right ml-auto max-w-[80%]"><b>Tú:</b> ${input}</div>`;
+        document.getElementById('userInput').value = '';
+        
+        const loadingId = 'loading-' + Date.now();
+        chatBox.innerHTML += `<div id="${loadingId}" class="text-gray-500 text-xs italic">VibePredict está procesando datos de CCU...</div>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        const systemPrompt = "Eres VibePredict, IA de vibecodingchile para CCU. Responde muy corto, técnico y enfocado en stock B2B. Pregunta: " + input;
+
+        try {
+            // Usamos el modelo más nuevo: gemini-1.5-flash
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] })
+            });
+            
+            const data = await response.json();
+            document.getElementById(loadingId).remove();
+            
+            // Si hay un error con la API key, lo mostramos
+            if (data.error) {
+                console.error(data.error);
+                chatBox.innerHTML += `<div class="text-red-400 p-2 text-xs">Error de API: ${data.error.message}</div>`;
+                return;
+            }
+
+            const aiResponse = data.candidates[0].content.parts[0].text;
+            chatBox.innerHTML += `<div class="bg-gray-800 border border-green-500 p-3 rounded-lg self-start max-w-[80%] text-green-300"><b>VibePredict:</b> ${aiResponse}</div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+        } catch (error) {
+            console.error(error);
+            document.getElementById(loadingId).remove();
+            chatBox.innerHTML += `<div class="text-red-500 p-2 text-xs">Error de conexión. Revisa que no haya espacios en tu API Key.</div>`;
+        }
+    }
+</script>
